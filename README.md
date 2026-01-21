@@ -28,20 +28,3 @@ Backend ini dirancang untuk digunakan pada aplikasi seperti:
 
 ---
 
-## 🧱 Tech Stack
-
-- Node.js 18+
-- Express.js
-- eBay Browse API
-- eBay Finding API (Completed Items)
-- node-fetch
-- dotenv
-
----
-
-## 📦 Installation
-
-```bash
-git clone https://github.com/your-repo/baseball-card-backend.git
-cd baseball-card-backend
-npm install
