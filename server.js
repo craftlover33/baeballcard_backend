@@ -1,7 +1,7 @@
 // ======================================================
-// THRIFT FASHION BACKEND v5 (FINAL)
+// BASEBALL CARD BACKEND v1
 // Trending + Search + Lookup + Recommend + PriceHistory
-// + Smart ChartData Expansion (no null results)
+// + Smart ChartData Expansion (eBay Sold Items)
 // ======================================================
 
 import express from "express";
@@ -101,63 +101,89 @@ function getCache(key) {
 }
 
 // ======================================================
-// FASHION FILTERING
+// BASEBALL CARD FILTERING
 // ======================================================
 const BLOCK_WORDS = [
-  "lego","funko","toy","poster","print","painting","frame",
-  "manual","booklet","guide","pattern",
-  "keychain","key chain","pin","badge","patch","magnet","sticker",
-  "bundle","joblot","job lot","bulk","wholesale","lots",
-  "charger","case","cover","phone","iphone","ipad","airpods","camera",
-  "pokemon","yugioh","yu-gi-oh","mtg","trading card","tcg",
-  "mug","cup","glass","lamp","furniture","sofa","chair","table",
-  "canvas","digital download","template","pdf"
+  "digital",
+  "reprint",
+  "custom",
+  "proxy",
+  "lot",
+  "lots",
+  "bulk",
+  "job lot",
+  "wholesale",
+  "binder",
+  "page",
+  "sleeve",
+  "sleeves",
+  "toploader",
+  "top loader",
+  "magazine",
+  "poster",
+  "photo",
+  "picture",
+  "frame",
+  "case",
+  "display",
+  "stand",
+  "supplies",
+  "album",
+  "stickers",
+  "decal",
+  "coin",
+  "token",
+  "poker",
+  "football",
+  "basketball",
+  "soccer",
+  "hockey",
+  "pokemon",
+  "yugioh",
+  "yu-gi-oh",
+  "mtg",
 ];
 
-function isFashion(item) {
+const CARD_KEYWORDS = [
+  "baseball card",
+  "rookie",
+  "rc",
+  "auto",
+  "autograph",
+  "on card auto",
+  "graded",
+  "psa",
+  "bgs",
+  "sgc",
+  "gem mint",
+  "topps",
+  "bowman",
+  "panini",
+  "upper deck",
+];
+
+function isBaseballCard(item) {
   if (!item?.title) return false;
   const t = item.title.toLowerCase();
 
-  if (BLOCK_WORDS.some(w => t.includes(w))) return false;
-
-  return (
-    t.includes("vintage") ||
-    t.includes("thrift") ||
-    t.includes("y2k") ||
-    t.includes("streetwear") ||
-    t.includes("jacket") ||
-    t.includes("coat") ||
-    t.includes("jeans") ||
-    t.includes("denim") ||
-    t.includes("shirt") ||
-    t.includes("t-shirt") ||
-    t.includes("tee") ||
-    t.includes("dress") ||
-    t.includes("skirt") ||
-    t.includes("hoodie") ||
-    t.includes("sweatshirt") ||
-    t.includes("pants") ||
-    t.includes("trousers") ||
-    t.includes("cargo") ||
-    t.includes("sweater") ||
-    t.includes("nike") ||
-    t.includes("adidas") ||
-    t.includes("jordan") ||
-    t.includes("new balance") ||
-    t.includes("sneaker") ||
-    t.includes("trainers") ||
-    t.includes("bag") ||
-    t.includes("tote")
-  );
+  if (BLOCK_WORDS.some((w) => t.includes(w))) return false;
+  return CARD_KEYWORDS.some((w) => t.includes(w));
 }
 
 // ======================================================
-// NORMALIZER
+// NORMALIZER (BASEBALL CARD)
 // ======================================================
-function normalizeThriftItem(item) {
+function normalizeBaseballCard(item) {
+  const title = item.title || "";
+
+  const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+  const gradeMatch = title.match(/\b(PSA|BGS|SGC)\s?\d+(\.\d+)?/i);
+  const rookieFlag =
+    /\brookie\b|\brc\b/gi.test(title) || title.toLowerCase().includes("rc #");
+
   return {
     itemId: item.itemId,
-    title: item.title,
+    title,
     price: item.price || null,
     image:
       item.thumbnailImages?.[0]?.imageUrl ||
@@ -166,6 +192,10 @@ function normalizeThriftItem(item) {
     url: item.itemWebUrl,
     condition: item.condition || null,
     brand: item.brand || null,
+    year: yearMatch ? yearMatch[0] : null,
+    grading: gradeMatch ? gradeMatch[0].toUpperCase() : "RAW",
+    isRookie: rookieFlag,
+    seller: item.seller?.username || null,
   };
 }
 
@@ -210,27 +240,23 @@ async function ebaySearch({ q, country = "US", extra = "" }) {
 }
 
 // ======================================================
-// 1) /thrift-trending
+// 1) /card-trending
 // ======================================================
-app.get("/thrift-trending", async (req, res) => {
+app.get("/card-trending", async (req, res) => {
   try {
     const { country = "US", limit = 40 } = req.query;
 
     const queries = [
-      "nike dunk",
-      "nike air force 1",
-      "adidas samba",
-      "new balance 550",
-      "jordan 1",
-      "vintage jacket",
-      "vintage jeans",
-      "vintage sweatshirt",
-      "90s jacket",
-      "y2k top",
-      "streetwear hoodie",
-      "supreme hoodie",
-      "carhartt jacket",
-      "stussy t shirt"
+      "Shohei Ohtani rookie psa",
+      "Mike Trout rookie psa",
+      "Aaron Judge rookie psa",
+      "Ronald Acuna Jr rookie psa",
+      "Julio Rodriguez rookie psa",
+      "Topps Chrome rookie psa",
+      "Bowman Chrome auto psa",
+      "vintage baseball card psa",
+      "Hank Aaron rookie psa",
+      "Derek Jeter rookie psa",
     ];
 
     let found = [];
@@ -242,7 +268,7 @@ app.get("/thrift-trending", async (req, res) => {
           country,
           extra: "&limit=50&sort=BEST_MATCH",
         });
-        found.push(...(json.itemSummaries || []).filter(isFashion));
+        found.push(...(json.itemSummaries || []).filter(isBaseballCard));
       } catch (err) {
         console.warn("⚠️ Skip query:", q, "|", err.message);
       }
@@ -250,13 +276,20 @@ app.get("/thrift-trending", async (req, res) => {
 
     const map = new Map();
     for (const it of found) {
-      if (!map.has(it.title)) map.set(it.title, it);
+      if (!map.has(it.itemId)) map.set(it.itemId, it);
     }
 
-    const enriched = [...map.values()].map(it => ({
-      ...normalizeThriftItem(it),
-      score: Number(it.price?.value || 0) + Math.random() * 10,
-    }));
+    const enriched = [...map.values()].map((it) => {
+      const norm = normalizeBaseballCard(it);
+      const baseScore = Number(it.price?.value || 0);
+      const rookieBoost = norm.isRookie ? 15 : 0;
+      const gradeBoost = norm.grading !== "RAW" ? 10 : 0;
+
+      return {
+        ...norm,
+        score: baseScore + rookieBoost + gradeBoost + Math.random() * 10,
+      };
+    });
 
     enriched.sort((a, b) => b.score - a.score);
 
@@ -266,21 +299,22 @@ app.get("/thrift-trending", async (req, res) => {
       items: enriched.slice(0, Number(limit)),
     });
   } catch (e) {
+    console.error("❌ /card-trending error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
 // ======================================================
-// 2) /thrift-search
+// 2) /card-search
 // ======================================================
-app.get("/thrift-search", async (req, res) => {
+app.get("/card-search", async (req, res) => {
   try {
     const {
       q = "",
       country = "US",
       page = 1,
       limit = 20,
-      sort = "best",
+      sort = "best", // best | price_low | price_high | newest
     } = req.query;
 
     const json = await ebaySearch({
@@ -289,18 +323,25 @@ app.get("/thrift-search", async (req, res) => {
       extra: "&limit=200",
     });
 
-    let items = (json.itemSummaries || []).filter(isFashion);
+    let items = (json.itemSummaries || []).filter(isBaseballCard);
 
     if (sort === "price_low")
-      items.sort((a, b) => Number(a.price?.value || 0) - Number(b.price?.value || 0));
+      items.sort(
+        (a, b) =>
+          Number(a.price?.value || 0) - Number(b.price?.value || 0)
+      );
 
     if (sort === "price_high")
-      items.sort((a, b) => Number(b.price?.value || 0) - Number(a.price?.value || 0));
+      items.sort(
+        (a, b) =>
+          Number(b.price?.value || 0) - Number(a.price?.value || 0)
+      );
 
     if (sort === "newest")
       items.sort(
         (a, b) =>
-          new Date(b.itemCreationDate || 0) - new Date(a.itemCreationDate || 0)
+          new Date(b.itemCreationDate || 0) -
+          new Date(a.itemCreationDate || 0)
       );
 
     const start = (Number(page) - 1) * Number(limit);
@@ -310,17 +351,18 @@ app.get("/thrift-search", async (req, res) => {
       country,
       query: q,
       total: items.length,
-      items: paged.map(normalizeThriftItem),
+      items: paged.map(normalizeBaseballCard),
     });
   } catch (e) {
+    console.error("❌ /card-search error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
 // ======================================================
-// 3) /lookup (BARCODE → GTIN)
+// 3) /card-lookup (BARCODE / TEXT → CARD)
 // ======================================================
-app.get("/lookup", async (req, res) => {
+app.get("/card-lookup", async (req, res) => {
   try {
     const code = req.query.code;
     const country = req.query.country || "US";
@@ -345,7 +387,7 @@ app.get("/lookup", async (req, res) => {
     });
 
     const json = await resp.json();
-    let items = (json.itemSummaries || []).filter(isFashion);
+    let items = (json.itemSummaries || []).filter(isBaseballCard);
 
     // fallback search with q=
     if (items.length === 0) {
@@ -354,13 +396,13 @@ app.get("/lookup", async (req, res) => {
         country,
         extra: "&limit=20",
       });
-      items = (fallback.itemSummaries || []).filter(isFashion);
+      items = (fallback.itemSummaries || []).filter(isBaseballCard);
 
       return res.json({
         code,
         fallback: true,
         total_items: items.length,
-        items: items.map(normalizeThriftItem),
+        items: items.map(normalizeBaseballCard),
       });
     }
 
@@ -368,17 +410,18 @@ app.get("/lookup", async (req, res) => {
       code,
       fallback: false,
       total_items: items.length,
-      items: items.map(normalizeThriftItem),
+      items: items.map(normalizeBaseballCard),
     });
   } catch (e) {
+    console.error("❌ /card-lookup error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
 // ======================================================
-// 4) /recommend
+// 4) /card-recommend (SIMILAR CARDS)
 // ======================================================
-app.get("/recommend", async (req, res) => {
+app.get("/card-recommend", async (req, res) => {
   try {
     const { id, country = "US", limit = 20 } = req.query;
     let q = req.query.q || "";
@@ -413,7 +456,7 @@ app.get("/recommend", async (req, res) => {
       }
     }
 
-    if (!q) q = "vintage jacket";
+    if (!q) q = "baseball card psa";
 
     const raw = await ebaySearch({
       q,
@@ -421,20 +464,21 @@ app.get("/recommend", async (req, res) => {
       extra: "&limit=200",
     });
 
-    let items = (raw.itemSummaries || []).filter(isFashion);
-    if (id) items = items.filter(i => i.itemId !== id);
+    let items = (raw.itemSummaries || []).filter(isBaseballCard);
+    if (id) items = items.filter((i) => i.itemId !== id);
 
     const baseWords = baseTitle
       .toLowerCase()
       .split(/\s+/)
-      .filter(w => w.length > 2);
+      .filter((w) => w.length > 2);
 
-    const recommended = items.map(it => {
-      const n = normalizeThriftItem(it);
+    const recommended = items.map((it) => {
+      const n = normalizeBaseballCard(it);
       const priceVal = Number(it.price?.value || 0);
 
       let score = 0;
 
+      // Same brand
       if (
         baseBrand &&
         n.brand &&
@@ -443,18 +487,24 @@ app.get("/recommend", async (req, res) => {
         score += 25;
       }
 
+      // Price similarity
       if (basePrice > 0 && priceVal > 0) {
         const diff = Math.abs(priceVal - basePrice);
         const ratio = diff / basePrice;
         score += Math.max(0, 15 - ratio * 20);
       }
 
+      // Title word overlap
       const words = n.title.toLowerCase().split(/\s+/);
       let overlap = 0;
-      baseWords.forEach(w => {
+      baseWords.forEach((w) => {
         if (words.includes(w)) overlap++;
       });
       score += overlap * 2;
+
+      // Rookie / graded boost
+      if (n.isRookie) score += 10;
+      if (n.grading !== "RAW") score += 8;
 
       score += Math.random() * 3;
 
@@ -477,14 +527,15 @@ app.get("/recommend", async (req, res) => {
       items: recommended.slice(0, Number(limit)),
     });
   } catch (e) {
+    console.error("❌ /card-recommend error:", e);
     res.status(500).json({ error: e.message });
   }
 });
 
 // ======================================================
-// 5) /price-history (SOLD ITEMS)
+// 5) /card-price-history (SOLD ITEMS)
 // ======================================================
-app.get("/price-history", async (req, res) => {
+app.get("/card-price-history", async (req, res) => {
   try {
     const q = req.query.q;
     const limit = req.query.limit || 30;
@@ -508,8 +559,11 @@ app.get("/price-history", async (req, res) => {
       json?.findCompletedItemsResponse?.[0]?.searchResult?.[0]?.item || [];
 
     const soldItems = items
-      .filter(i => i.sellingStatus?.[0]?.sellingState?.[0] === "EndedWithSales")
-      .map(i => {
+      .filter(
+        (i) =>
+          i.sellingStatus?.[0]?.sellingState?.[0] === "EndedWithSales"
+      )
+      .map((i) => {
         const price = Number(
           i.sellingStatus?.[0]?.currentPrice?.[0]?.__value__ || 0
         );
@@ -518,7 +572,8 @@ app.get("/price-history", async (req, res) => {
           price,
           url: i.viewItemURL?.[0] || "",
           image: i.galleryURL?.[0] || null,
-          condition: i.condition?.[0]?.conditionDisplayName?.[0] || "Unknown",
+          condition:
+            i.condition?.[0]?.conditionDisplayName?.[0] || "Unknown",
           endDate: i.listingInfo?.[0]?.endTime?.[0] || null,
         };
       });
@@ -531,12 +586,13 @@ app.get("/price-history", async (req, res) => {
       });
     }
 
-    const prices = soldItems.map(i => i.price).sort((a, b) => a - b);
+    const prices = soldItems.map((i) => i.price).sort((a, b) => a - b);
     const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
 
     let median;
     if (prices.length % 2 === 0) {
-      median = (prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2;
+      median =
+        (prices[prices.length / 2 - 1] + prices[prices.length / 2]) / 2;
     } else {
       median = prices[Math.floor(prices.length / 2)];
     }
@@ -551,15 +607,15 @@ app.get("/price-history", async (req, res) => {
       items: soldItems,
     });
   } catch (error) {
-    console.error("❌ Price history error:", error);
+    console.error("❌ /card-price-history error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // ======================================================
-// 6) /chart-data (SMART QUERY EXPANSION)
+// 6) /card-chart-data (SMART QUERY EXPANSION)
 // ======================================================
-app.get("/chart-data", async (req, res) => {
+app.get("/card-chart-data", async (req, res) => {
   try {
     const q = req.query.q;
     if (!q)
@@ -568,20 +624,19 @@ app.get("/chart-data", async (req, res) => {
     // SMART EXPANSIONS
     const expansions = [
       q,
-      q.replace(/\s+/g, ""), // adidas sl72
-      q.replace(" ", "-"), // adidas sl-72
-      q.replace("-", " "), // adidas sl 72
-      q.split(" ").reverse().join(" "), // sl 72 adidas
+      q.replace(/\s+/g, ""), // remove spaces
+      q.replace(" ", "-"),
+      q.replace("-", " "),
+      q.split(" ").reverse().join(" "),
     ];
 
-    // Add thrift expansions
     const lower = q.toLowerCase();
-    if (lower.includes("adidas") || lower.includes("nike")) {
+    if (lower.includes("psa") || lower.includes("rookie")) {
       expansions.push(
-        q + " retro",
-        q + " vintage",
-        q + " og",
-        q + " classic",
+        q + " psa",
+        q + " psa 10",
+        q + " rookie",
+        q + " rc"
       );
     }
 
@@ -606,9 +661,10 @@ app.get("/chart-data", async (req, res) => {
 
       const sold = items
         .filter(
-          it => it.sellingStatus?.[0]?.sellingState?.[0] === "EndedWithSales"
+          (it) =>
+            it.sellingStatus?.[0]?.sellingState?.[0] === "EndedWithSales"
         )
-        .map(it => ({
+        .map((it) => ({
           price: Number(
             it.sellingStatus?.[0]?.currentPrice?.[0]?.__value__ || 0
           ),
@@ -618,7 +674,6 @@ app.get("/chart-data", async (req, res) => {
       return sold;
     }
 
-    // Combine all results
     let combined = [];
     for (const kw of uniq) {
       const sold = await fetchSold(kw);
@@ -627,7 +682,7 @@ app.get("/chart-data", async (req, res) => {
 
     // Deduplicate
     const map = new Map();
-    combined.forEach(item => {
+    combined.forEach((item) => {
       const key = item.date.toISOString() + "-" + item.price;
       if (!map.has(key)) map.set(key, item);
     });
@@ -644,12 +699,12 @@ app.get("/chart-data", async (req, res) => {
     }
 
     const now = new Date();
-    const daysAgo = d => new Date(now.getTime() - d * 86400000);
+    const daysAgo = (d) => new Date(now.getTime() - d * 86400000);
 
-    const rangeData = days =>
-      combined.filter(i => i.date >= daysAgo(days)).map(i => i.price);
+    const rangeData = (days) =>
+      combined.filter((i) => i.date >= daysAgo(days)).map((i) => i.price);
 
-    const makeSummary = prices => {
+    const makeSummary = (prices) => {
       if (!prices.length) return null;
       const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
       return {
@@ -673,7 +728,7 @@ app.get("/chart-data", async (req, res) => {
       chart,
     });
   } catch (err) {
-    console.error("❌ Chart Data Error:", err);
+    console.error("❌ /card-chart-data error:", err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -683,7 +738,7 @@ app.get("/chart-data", async (req, res) => {
 // ======================================================
 app.get("/", (req, res) => {
   res.send(
-    "🔥 Thrift Fashion Backend v5 (Trending + Search + Lookup + Recommend + PriceHistory + SmartChart) is running."
+    "⚾ Baseball Card Backend v1 (Trending + Search + Lookup + Recommend + PriceHistory + SmartChart) is running."
   );
 });
 
@@ -691,5 +746,5 @@ app.get("/", (req, res) => {
 // START SERVER
 // ======================================================
 app.listen(PORT, () => {
-  console.log(`🚀 Thrift Fashion Backend v5 running on port ${PORT}`);
+  console.log(`🚀 Baseball Card Backend v1 running on port ${PORT}`);
 });
